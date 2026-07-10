@@ -18,7 +18,7 @@ pragma solidity 0.8.34;
 
 import "forge-std/Test.sol";
 
-import { ValueRegistry } from "../src/ValueRegistry.sol";
+import {ValueRegistry} from "../src/ValueRegistry.sol";
 
 contract ValueRegistryTest is Test {
     ValueRegistry registry;

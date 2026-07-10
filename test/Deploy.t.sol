@@ -18,8 +18,8 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 
-import { DeployValueRegistry } from "../script/Deploy.s.sol";
-import { ValueRegistry } from "../src/ValueRegistry.sol";
+import {DeployValueRegistry} from "../script/Deploy.s.sol";
+import {ValueRegistry} from "../src/ValueRegistry.sol";
 
 contract DeployTest is Test {
     DeployValueRegistry deploy;

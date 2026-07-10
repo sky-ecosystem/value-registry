@@ -16,9 +16,9 @@
 
 pragma solidity 0.8.34;
 
-import { Script } from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
-import { ValueRegistry } from "../src/ValueRegistry.sol";
+import {ValueRegistry} from "../src/ValueRegistry.sol";
 
 /// @title Deploy script for the ValueRegistry
 /// @notice Deploys the registry, relies each admin, kisses each bud and
