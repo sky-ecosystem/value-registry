@@ -44,7 +44,7 @@ All values are stored **WAD-scaled** (multiplied by `1e18`), uniformly — inclu
 
 ```shell
 forge build      # compile
-forge test       # run tests
+forge test       # run tests (requires `ETH_RPC_URL` to run test on ethereum mainnet fork)
 forge fmt        # format
 ```
 

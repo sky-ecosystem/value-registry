@@ -28,6 +28,7 @@ contract ValueRegistryTest is Test {
     address unauth = address(0xdead);
 
     function setUp() public {
+        vm.createSelectFork(vm.rpcUrl("mainnet"));
         registry = new ValueRegistry();
         registry.kiss(bud);
     }
