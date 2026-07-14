@@ -187,7 +187,6 @@ contract ValueRegistry {
     }
 
     /// @notice Returns the list of keys being tracked by the registry
-    /// @dev May fail if keys is too large, if so, call count() and iterate with get()
     function list() external view returns (bytes32[] memory) {
         return keys;
     }
