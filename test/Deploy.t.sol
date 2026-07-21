@@ -22,14 +22,14 @@ import {DeployValueRegistry} from "../script/Deploy.s.sol";
 import {ValueRegistry} from "../src/ValueRegistry.sol";
 
 contract DeployTest is Test {
-    DeployValueRegistry deploy;
+    DeployValueRegistry script;
 
     address admin = address(0xa27);
     address admin2 = address(0xa28);
     address bud = address(0xb0d);
 
     function setUp() public {
-        deploy = new DeployValueRegistry();
+        script = new DeployValueRegistry();
     }
 
     /// @dev Runs the script and recovers the deployer (broadcast sender)
@@ -37,14 +37,22 @@ contract DeployTest is Test {
     ///      on which sender forge picks for broadcasts
     function _run(address[] memory admins, address[] memory buds)
         internal
-        returns (ValueRegistry registry, address deployer)
+        returns (ValueRegistry registry, address deployer, Vm.Log[] memory logs)
     {
         vm.recordLogs();
-        registry = deploy.run(admins, buds);
+        registry = script.run(admins, buds);
 
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+        logs = vm.getRecordedLogs();
         assertEq(logs[0].topics[0], ValueRegistry.Rely.selector);
         deployer = address(uint160(uint256(logs[0].topics[1])));
+    }
+
+    /// @dev Counts `topic0(usr)` events emitted for `usr` in the recorded logs
+    function _countFor(Vm.Log[] memory logs, bytes32 topic0, address usr) internal pure returns (uint256 n) {
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].topics.length < 2) continue;
+            if (logs[i].topics[0] == topic0 && logs[i].topics[1] == bytes32(uint256(uint160(usr)))) n++;
+        }
     }
 
     function testRun() public {
@@ -54,7 +62,7 @@ contract DeployTest is Test {
         address[] memory buds = new address[](1);
         buds[0] = bud;
 
-        (ValueRegistry registry, address deployer) = _run(admins, buds);
+        (ValueRegistry registry, address deployer,) = _run(admins, buds);
 
         assertEq(registry.wards(admin), 1, "admin-is-ward");
         assertEq(registry.wards(admin2), 1, "admin2-is-ward");
@@ -71,7 +79,7 @@ contract DeployTest is Test {
         address[] memory admins = new address[](1);
         admins[0] = admin;
 
-        (ValueRegistry registry,) = _run(admins, new address[](0));
+        (ValueRegistry registry,,) = _run(admins, new address[](0));
 
         assertEq(registry.wards(admin), 1);
     }
@@ -80,16 +88,23 @@ contract DeployTest is Test {
         // Discovery run to learn the broadcast sender used in this environment
         address[] memory admins = new address[](1);
         admins[0] = admin;
-        (, address deployer) = _run(admins, new address[](0));
+        (, address deployer,) = _run(admins, new address[](0));
 
         address[] memory adminsWithDeployer = new address[](2);
         adminsWithDeployer[0] = admin;
         adminsWithDeployer[1] = deployer;
-        (ValueRegistry registry, address deployer2) = _run(adminsWithDeployer, new address[](0));
+        (ValueRegistry registry, address deployer2, Vm.Log[] memory logs) =
+            _run(adminsWithDeployer, new address[](0));
 
         assertEq(deployer2, deployer, "same-broadcast-sender");
         assertEq(registry.wards(deployer), 1, "deployer-admin-keeps-access");
         assertEq(registry.wards(admin), 1, "admin-is-ward");
+
+        // The constructor already relies the deployer, so listing them as an admin
+        // must not emit a second Rely, and must not emit a Deny that is later undone
+        assertEq(_countFor(logs, ValueRegistry.Rely.selector, deployer), 1, "no-double-rely-deployer");
+        assertEq(_countFor(logs, ValueRegistry.Rely.selector, admin), 1, "single-rely-admin");
+        assertEq(_countFor(logs, ValueRegistry.Deny.selector, deployer), 0, "no-deny-deployer");
     }
 
     function testRevertRunNoAdmins() public {
@@ -97,6 +112,6 @@ contract DeployTest is Test {
         buds[0] = bud;
 
         vm.expectRevert("DeployValueRegistry/no-admins");
-        deploy.run(new address[](0), buds);
+        script.run(new address[](0), buds);
     }
 }

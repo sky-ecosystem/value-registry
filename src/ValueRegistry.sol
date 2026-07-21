@@ -16,15 +16,21 @@
 
 pragma solidity 0.8.34;
 
-/// @title An on-chain registry for stUSDS rate calculation meta-parameters
+/// @title An on-chain key/value registry for signed integer parameters
 /// @notice Publicly readable data; mutating functions must be called by an authorized user
 /// @dev Values are signed integers; the convention is WAD scaling (1e18)
-///      for all fractional parameters, e.g. OPT_UTIL_WAD = 0.9e18
+///      for all fractional parameters, e.g. PARAM_WAD = 0.9e18
 contract ValueRegistry {
     // --- Structs ---
     /// @notice A registered value and its position in the keys array
     struct Value {
-        uint256 pos; // 1 based position in the keys array; 0 means not present
+        uint256 pos; // only meaningful if keys[pos] == key
+        int256 val; // The value, WAD-scaled by convention
+    }
+
+    /// @notice A key/value pair, as accepted by `setValues`
+    struct KeyValue {
+        bytes32 key; // The parameter key (ex. PARAM_WAD)
         int256 val; // The value, WAD-scaled by convention
     }
 
@@ -116,48 +122,71 @@ contract ValueRegistry {
         emit Diss(usr);
     }
 
-    /// @notice Set the value for a parameter key
-    /// @param key The parameter key (ex. OPT_UTIL_WAD)
-    /// @param val The value, WAD-scaled by convention
-    function setValue(bytes32 key, int256 val) external toll {
-        Value storage value = values[key];
-        if (value.pos == 0) {
-            keys.push(key);
-            value.pos = keys.length;
+    /// @notice Set the value for one or more parameter keys
+    /// @dev Later items win if the same key appears more than once in `items`
+    /// @param items The key/value pairs to set
+    function setValues(KeyValue[] calldata items) external toll {
+        for (uint256 i; i < items.length; i++) {
+            _setValue(items[i].key, items[i].val);
         }
-        value.val = val;
+    }
+
+    /// @notice Removes one or more keys from the keys list()
+    /// @dev Removes each item from the array but moves the last element to its place
+    //   WARNING: To save the expense of shifting an array on-chain,
+    //     this will replace the key to be deleted with the last key
+    //     in the array, and can therefore result in keys being out
+    //     of order. Use this only if you intend to reorder the list().
+    /// @param keys_ The keys to be removed
+    function removeValues(bytes32[] calldata keys_) external toll {
+        for (uint256 i; i < keys_.length; i++) {
+            _removeValue(keys_[i]);
+        }
+    }
+
+    // --- Internals ---
+    /// @notice Set the value for a single parameter key
+    /// @param key The parameter key (ex. PARAM_WAD)
+    /// @param val The value, WAD-scaled by convention
+    function _setValue(bytes32 key, int256 val) internal {
+        if (has(key)) {
+            values[key].val = val; // Key exists in keys (update)
+        } else {
+            keys.push(key);
+            values[key] = Value(keys.length - 1, val);
+        }
         emit SetValue(key, val);
     }
 
-    /// @notice Remove a key from the registry
+    /// @notice Removes a single key from the keys list()
     /// @param key The key to be removed
-    function removeValue(bytes32 key) external toll {
-        Value storage value = values[key];
-        uint256 pos = value.pos;
-        require(pos != 0, "ValueRegistry/invalid-key");
-
-        bytes32 move = keys[keys.length - 1];
+    function _removeValue(bytes32 key) internal {
+        require(has(key), "ValueRegistry/invalid-key");
+        uint256 index = values[key].pos; // Get pos in array
+        bytes32 move = keys[keys.length - 1]; // Get last key
         if (move != key) {
-            keys[pos - 1] = move;
-            values[move].pos = pos;
+            keys[index] = move; // Replace
+            values[move].pos = index; // Update array pos
         }
-        keys.pop();
-        delete values[key];
+        keys.pop(); // Trim last key
+        delete values[key]; // Delete struct data
         emit RemoveValue(key);
     }
 
     // --- Getters ---
     /// @notice Returns the number of keys being tracked in the keys array
     /// @return The number of keys
-    function count() external view returns (uint256) {
+    function count() public view returns (uint256) {
         return keys.length;
     }
 
     /// @notice Returns whether a value is set for a particular key
-    /// @param key The parameter key (ex. OPT_UTIL_WAD)
+    /// @dev A value of 0 is indistinguishable from an unset key by value alone,
+    ///      so presence is derived from the key's position in the keys array
+    /// @param key The parameter key (ex. PARAM_WAD)
     /// @return Whether the key is set
-    function has(bytes32 key) external view returns (bool) {
-        return values[key].pos != 0;
+    function has(bytes32 key) public view returns (bool) {
+        return count() > 0 && keys[values[key].pos] == key;
     }
 
     /// @notice Returns the key and value of an item in the registry (for enumeration)
@@ -169,12 +198,11 @@ contract ValueRegistry {
     }
 
     /// @notice Returns the value for a particular key
-    /// @param key The parameter key (ex. OPT_UTIL_WAD)
+    /// @param key The parameter key (ex. PARAM_WAD)
     /// @return val The value associated with the key
     function getValue(bytes32 key) external view returns (int256 val) {
-        Value storage value = values[key];
-        require(value.pos != 0, "ValueRegistry/invalid-key");
-        val = value.val;
+        require(has(key), "ValueRegistry/invalid-key");
+        val = values[key].val;
     }
 
     /// @return The list of keys being tracked by the registry

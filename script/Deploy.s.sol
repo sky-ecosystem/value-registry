@@ -34,8 +34,8 @@ contract DeployValueRegistry is Script {
 
         bool deployerIsAdmin;
         for (uint256 i; i < admins.length; i++) {
-            registry.rely(admins[i]);
             if (admins[i] == deployer) deployerIsAdmin = true;
+            else registry.rely(admins[i]);
         }
 
         for (uint256 i; i < buds.length; i++) {

@@ -1,6 +1,6 @@
-# stUSDS Value Registry
+# Sky Value Registry
 
-On-chain key/value registry for the stUSDS rate calculation meta-parameters, structurally similar to the [Chainlog](https://github.com/makerdao/dss-chain-log) but storing **signed integer values** (`int256`) instead of addresses.
+On-chain key/value registry for numeric parameters, structurally similar to the [Chainlog](https://github.com/makerdao/dss-chain-log) but storing **signed integer values** (`int256`) instead of addresses.
 
 ## Roles
 
@@ -11,10 +11,10 @@ On-chain key/value registry for the stUSDS rate calculation meta-parameters, str
 
 Write (buds only):
 
-- **`setValue(bytes32 key, int256 val)`** — set or overwrite a value.
-- **`removeValue(bytes32 key)`** — remove a key, reverts if unset.
+- **`setValues(KeyValue[] items)`** — set or overwrite values. `KeyValue` is `{bytes32 key; int256 val;}`. If the same key appears twice in one call, the last item wins.
+- **`removeValues(bytes32[] keys)`** — remove keys, reverts if any is unset.
 
-There are deliberately no batch methods: updating multiple values atomically in one transaction is handled by the calling multisig (e.g. a Safe MultiSend batch of `setValue` calls).
+Both methods are batch-only; pass a one-element array for a single update. A batch is atomic - if `removeValues` hits an unset key partway through, the whole call reverts and no keys are removed.
 
 Read:
 
@@ -25,20 +25,16 @@ Every mutation emits `SetValue(key, val)` or `RemoveValue(key)`.
 
 ## Value convention
 
-All values are stored **WAD-scaled** (multiplied by `1e18`), uniformly — including plain counts. Keys carry a `_WAD` suffix and are `bytes32`-encoded strings, e.g. `cast format-bytes32-string "OPT_UTIL_WAD"`.
+The registry itself is agnostic about keys and scaling; by convention values are stored **WAD-scaled** (multiplied by `1e18`), uniformly — including plain counts. Keys carry a `_WAD` suffix and are `bytes32`-encoded strings, e.g. `cast format-bytes32-string "PARAM_WAD"`.
+
+**Examples**
 
 | Key | Human value | Stored value |
 |---|---|---|
-| `ACCESSIBILITY_REWARD_WAD` | 0.002 | 0.002e18 |
-| `OPT_UTIL_WAD` | 0.9 | 0.9e18 |
-| `BASE_SPREAD_WAD` | 0.001 | 0.001e18 |
-| `SPREAD_PCT_WAD` | 0.1 | 0.1e18 |
-| `TIME_DRIFT_SPEED_WAD` | 0.03 | 0.03e18 |
-| `ABOVE_KINK_MULTIPLIER_WAD` | 0.77 | 0.77e18 |
-| `CAP_FACTOR_WAD` | 1.35 | 1.35e18 |
-| `LINE_FACTOR_WAD` | 1.20 | 1.2e18 |
-| `AVERAGE_UTILIZATION_HOURS_WAD` | 24 | 24e18 |
-| `UPDATE_THRESHOLD_WAD` | 2 bps | 0.0002e18 |
+| `PARAM_WAD` | 0.9 | 0.9e18 |
+| `NEGATIVE_PARAM_WAD` | -0.5 | -0.5e18 |
+| `HOURS_WAD` | 24 | 24e18 |
+| `THRESHOLD_WAD` | 2 bps | 0.0002e18 |
 
 ## Development
 

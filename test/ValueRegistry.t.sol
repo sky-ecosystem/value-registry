@@ -100,34 +100,34 @@ contract ValueRegistryTest is Test {
 
     function testSetValue() public {
         assertEq(registry.count(), 0);
-        assertEq(registry.has("OPT_UTIL_WAD"), false);
+        assertEq(registry.has("PARAM_WAD"), false);
 
         vm.expectEmit(true, false, false, true);
-        emit ValueRegistry.SetValue("OPT_UTIL_WAD", int256(0.9e18));
+        emit ValueRegistry.SetValue("PARAM_WAD", int256(0.9e18));
         vm.prank(bud);
-        registry.setValue("OPT_UTIL_WAD", int256(0.9e18));
+        registry.setValue("PARAM_WAD", int256(0.9e18));
 
         assertEq(registry.count(), 1);
-        assertTrue(registry.has("OPT_UTIL_WAD"));
-        assertEq(registry.getValue("OPT_UTIL_WAD"), int256(0.9e18));
+        assertTrue(registry.has("PARAM_WAD"));
+        assertEq(registry.getValue("PARAM_WAD"), int256(0.9e18));
 
         (bytes32 key, int256 val) = registry.get(0);
-        assertEq(key, "OPT_UTIL_WAD");
+        assertEq(key, "PARAM_WAD");
         assertEq(val, int256(0.9e18));
 
         bytes32[] memory listed = registry.list();
         assertEq(listed.length, 1);
-        assertEq(listed[0], "OPT_UTIL_WAD");
+        assertEq(listed[0], "PARAM_WAD");
     }
 
     function testSetValueOverwrite() public {
         vm.startPrank(bud);
-        registry.setValue("OPT_UTIL_WAD", int256(0.9e18));
-        registry.setValue("OPT_UTIL_WAD", int256(0.85e18));
+        registry.setValue("PARAM_WAD", int256(0.9e18));
+        registry.setValue("PARAM_WAD", int256(0.85e18));
         vm.stopPrank();
 
         assertEq(registry.count(), 1, "overwrite-must-not-duplicate-key");
-        assertEq(registry.getValue("OPT_UTIL_WAD"), int256(0.85e18));
+        assertEq(registry.getValue("PARAM_WAD"), int256(0.85e18));
     }
 
     function testSetValueZeroAndNegative() public {
@@ -194,10 +194,36 @@ contract ValueRegistryTest is Test {
         assertEq(key1, "A", "re-added-key-not-appended-at-end");
     }
 
+    function testUnsetKeyDoesNotAliasFirstSlot() public {
+        // An unset key has `pos == 0`, which points at the first slot of the
+        // keys array; presence must still be resolved via `keys[pos] == key`
+        vm.prank(bud);
+        registry.setValue("A", int256(1));
+
+        assertEq(registry.has("UNSET"), false);
+        vm.expectRevert("ValueRegistry/invalid-key");
+        registry.getValue("UNSET");
+
+        vm.prank(bud);
+        registry.setValue("UNSET", int256(2));
+        assertEq(registry.count(), 2, "unset-key-must-be-appended-not-overwrite-slot-0");
+        assertEq(registry.getValue("A"), int256(1));
+        assertEq(registry.getValue("UNSET"), int256(2));
+    }
+
     function testRevertRemoveValueUnsetKey() public {
+        vm.prank(bud);
+        registry.setValue("A", int256(1));
+
         vm.expectRevert("ValueRegistry/invalid-key");
         vm.prank(bud);
         registry.removeValue("UNSET");
+    }
+
+    function testRevertRemoveValueEmptyRegistry() public {
+        vm.expectRevert("ValueRegistry/invalid-key");
+        vm.prank(bud);
+        registry.removeValue("A");
     }
 
     function testRevertGetValueUnsetKey() public {
