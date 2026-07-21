@@ -34,11 +34,13 @@ contract DeployValueRegistry is Script {
 
         bool deployerIsAdmin;
         for (uint256 i; i < admins.length; i++) {
+            require(admins[i] != address(0), "DeployValueRegistry/admin-is-zero");
             if (admins[i] == deployer) deployerIsAdmin = true;
             else registry.rely(admins[i]);
         }
 
         for (uint256 i; i < buds.length; i++) {
+            require(buds[i] != address(0), "DeployValueRegistry/bud-is-zero");
             registry.kiss(buds[i]);
         }
 

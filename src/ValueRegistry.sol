@@ -28,7 +28,7 @@ contract ValueRegistry {
         int256 val; // The value, WAD-scaled by convention
     }
 
-    /// @notice A key/value pair, as accepted by `setValues`
+    /// @notice A key/value pair
     struct KeyValue {
         bytes32 key; // The parameter key (ex. PARAM_WAD)
         int256 val; // The value, WAD-scaled by convention
@@ -200,9 +200,21 @@ contract ValueRegistry {
     /// @notice Returns the value for a particular key
     /// @param key The parameter key (ex. PARAM_WAD)
     /// @return val The value associated with the key
-    function getValue(bytes32 key) external view returns (int256 val) {
+    function getValue(bytes32 key) public view returns (int256 val) {
         require(has(key), "ValueRegistry/invalid-key");
         val = values[key].val;
+    }
+
+    /// @notice Returns the key/value pairs for a set of keys, in the order requested
+    /// @dev Reverts if any of the keys is unset; there is no partial result.
+    ///      The result is shaped so it can be fed straight back into `setValues`
+    /// @param keys_ The parameter keys (ex. PARAM_WAD)
+    /// @return items The key/value pairs associated with the keys
+    function getValues(bytes32[] calldata keys_) external view returns (KeyValue[] memory items) {
+        items = new KeyValue[](keys_.length);
+        for (uint256 i; i < keys_.length; i++) {
+            items[i] = KeyValue(keys_[i], getValue(keys_[i]));
+        }
     }
 
     /// @return The list of keys being tracked by the registry

@@ -64,15 +64,15 @@ contract DeployTest is Test {
 
         (ValueRegistry registry, address deployer,) = _run(admins, buds);
 
-        assertEq(registry.wards(admin), 1, "admin-is-ward");
-        assertEq(registry.wards(admin2), 1, "admin2-is-ward");
-        assertEq(registry.buds(bud), 1, "bud-is-bud");
-        assertEq(registry.wards(bud), 0, "bud-is-not-ward");
-        assertEq(registry.buds(admin), 0, "admin-is-not-bud");
+        assertEq(registry.wards(admin), 1, "testRun/admin-is-ward");
+        assertEq(registry.wards(admin2), 1, "testRun/admin2-is-ward");
+        assertEq(registry.buds(bud), 1, "testRun/bud-is-bud");
+        assertEq(registry.wards(bud), 0, "testRun/bud-is-not-ward");
+        assertEq(registry.buds(admin), 0, "testRun/admin-is-not-bud");
 
-        assertEq(registry.wards(deployer), 0, "deployer-denied");
+        assertEq(registry.wards(deployer), 0, "testRun/deployer-denied");
 
-        assertEq(registry.count(), 0, "registry-starts-empty");
+        assertEq(registry.count(), 0, "testRun/registry-starts-empty");
     }
 
     function testRunNoBuds() public {
@@ -81,7 +81,7 @@ contract DeployTest is Test {
 
         (ValueRegistry registry,,) = _run(admins, new address[](0));
 
-        assertEq(registry.wards(admin), 1);
+        assertEq(registry.wards(admin), 1, "testRunNoBuds/admin-is-ward");
     }
 
     function testRunDeployerIsAdmin() public {
@@ -93,18 +93,39 @@ contract DeployTest is Test {
         address[] memory adminsWithDeployer = new address[](2);
         adminsWithDeployer[0] = admin;
         adminsWithDeployer[1] = deployer;
-        (ValueRegistry registry, address deployer2, Vm.Log[] memory logs) =
-            _run(adminsWithDeployer, new address[](0));
+        (ValueRegistry registry, address deployer2, Vm.Log[] memory logs) = _run(adminsWithDeployer, new address[](0));
 
-        assertEq(deployer2, deployer, "same-broadcast-sender");
-        assertEq(registry.wards(deployer), 1, "deployer-admin-keeps-access");
-        assertEq(registry.wards(admin), 1, "admin-is-ward");
+        assertEq(deployer2, deployer, "testRunDeployerIsAdmin/same-broadcast-sender");
+        assertEq(registry.wards(deployer), 1, "testRunDeployerIsAdmin/deployer-admin-keeps-access");
+        assertEq(registry.wards(admin), 1, "testRunDeployerIsAdmin/admin-is-ward");
 
         // The constructor already relies the deployer, so listing them as an admin
         // must not emit a second Rely, and must not emit a Deny that is later undone
-        assertEq(_countFor(logs, ValueRegistry.Rely.selector, deployer), 1, "no-double-rely-deployer");
-        assertEq(_countFor(logs, ValueRegistry.Rely.selector, admin), 1, "single-rely-admin");
-        assertEq(_countFor(logs, ValueRegistry.Deny.selector, deployer), 0, "no-deny-deployer");
+        assertEq(
+            _countFor(logs, ValueRegistry.Rely.selector, deployer), 1, "testRunDeployerIsAdmin/no-double-rely-deployer"
+        );
+        assertEq(_countFor(logs, ValueRegistry.Rely.selector, admin), 1, "testRunDeployerIsAdmin/single-rely-admin");
+        assertEq(_countFor(logs, ValueRegistry.Deny.selector, deployer), 0, "testRunDeployerIsAdmin/no-deny-deployer");
+    }
+
+    function testRevertRunZeroAddressAdmin() public {
+        address[] memory admins = new address[](2);
+        admins[0] = admin;
+        admins[1] = address(0);
+
+        vm.expectRevert("DeployValueRegistry/admin-is-zero");
+        script.run(admins, new address[](0));
+    }
+
+    function testRevertRunZeroAddressBud() public {
+        address[] memory admins = new address[](1);
+        admins[0] = admin;
+        address[] memory buds = new address[](2);
+        buds[0] = bud;
+        buds[1] = address(0);
+
+        vm.expectRevert("DeployValueRegistry/bud-is-zero");
+        script.run(admins, buds);
     }
 
     function testRevertRunNoAdmins() public {

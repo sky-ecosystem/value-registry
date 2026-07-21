@@ -19,6 +19,7 @@ Both methods are batch-only; pass a one-element array for a single update. A bat
 Read:
 
 - **`getValue(bytes32 key)`** — returns the value, reverts if the key is unset so an unset parameter can never be silently read as `0`.
+- **`getValues(bytes32[] keys)`** — returns `KeyValue[]` in the order requested; reverts if any key is unset, so there is never a partial result. The result can be fed straight back into `setValues`.
 - **`has(bytes32 key)`**, **`count()`**, **`get(uint256 index)`**, **`list()`** — enumeration helpers.
 
 Every mutation emits `SetValue(key, val)` or `RemoveValue(key)`.
