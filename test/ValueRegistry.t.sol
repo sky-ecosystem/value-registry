@@ -76,10 +76,10 @@ contract ValueRegistryTest is Test {
     // --- State assertions ---
 
     /// @dev Asserts `key` holds `val` and sits at `index`, consistently across
-    ///      every read path: has(), getValue(), get(index) and list()
+    ///      every read path: has(), getValues(), get(index) and list()
     function _assertEntryAt(uint256 index, bytes32 key, int256 val, string memory ctx) internal view {
         assertTrue(registry.has(key), string.concat(ctx, "/has"));
-        assertEq(registry.getValue(key), val, string.concat(ctx, "/getValue"));
+        assertEq(registry.getValues(_keys(key))[0].val, val, string.concat(ctx, "/getValues"));
 
         (bytes32 gotKey, int256 gotVal) = registry.get(index);
         assertEq(gotKey, key, string.concat(ctx, "/get-key"));
@@ -88,13 +88,13 @@ contract ValueRegistryTest is Test {
         assertEq(registry.list()[index], key, string.concat(ctx, "/list"));
     }
 
-    /// @dev Asserts `key` is not registered: has() is false and getValue() reverts
+    /// @dev Asserts `key` is not registered: has() is false and getValues() reverts
     ///      rather than silently returning 0
     function _assertAbsent(bytes32 key, string memory ctx) internal {
         assertFalse(registry.has(key), string.concat(ctx, "/has"));
 
         vm.expectRevert("ValueRegistry/invalid-key");
-        registry.getValue(key);
+        registry.getValues(_keys(key));
     }
 
     /// @dev Asserts the registry holds exactly `n` keys, and that index `n` is
@@ -464,11 +464,6 @@ contract ValueRegistryTest is Test {
         registry.removeValues(_keys("A"));
 
         _assertCount(0, "testRevertRemoveValueEmptyRegistry/still-empty");
-    }
-
-    function testRevertGetValueUnsetKey() public {
-        vm.expectRevert("ValueRegistry/invalid-key");
-        registry.getValue("UNSET");
     }
 
     function testRevertGetIndexOutOfBounds() public {

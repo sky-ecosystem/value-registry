@@ -1,4 +1,4 @@
-# Sky Value Registry
+# Value Registry
 
 On-chain key/value registry for numeric parameters, structurally similar to the [Chainlog](https://github.com/makerdao/dss-chain-log) but storing **signed integer values** (`int256`) instead of addresses.
 
@@ -26,16 +26,7 @@ Every mutation emits `SetValue(key, val)` or `RemoveValue(key)`.
 
 ## Value convention
 
-The registry itself is agnostic about keys and scaling; by convention values are stored **WAD-scaled** (multiplied by `1e18`), uniformly — including plain counts. Keys carry a `_WAD` suffix and are `bytes32`-encoded strings, e.g. `cast format-bytes32-string "PARAM_WAD"`.
-
-**Examples**
-
-| Key | Human value | Stored value |
-|---|---|---|
-| `PARAM_WAD` | 0.9 | 0.9e18 |
-| `NEGATIVE_PARAM_WAD` | -0.5 | -0.5e18 |
-| `HOURS_WAD` | 24 | 24e18 |
-| `THRESHOLD_WAD` | 2 bps | 0.0002e18 |
+The registry itself is agnostic about keys and values. However, the proposed convention is to use `bytes32`-encoded strings for keys, with a suffix to indicate decimal count of the value. For example, use `_WAD` suffix for WAD-scaled values (18 decimal points) or `_BPS` for basis points (4 decimal points) or no suffix for plain numbers.
 
 ## Development
 
@@ -62,10 +53,24 @@ git submodule update --init --recursive
     ```shell
     forge script script/Deploy.s.sol:DeployValueRegistry \
         --sig "run(address[],address[])" "[<ADMIN_1>,<ADMIN_2>]" "[<BUD_1>]" \
-        --rpc-url "$ETH_RPC_URL" \
+        --rpc-url mainnet \
         --account <ACCOUNT_NAME> \
         --verify \
         --broadcast
     ```
 
 The script deploys the registry (the deployer becomes a ward via the constructor), relies each admin, kisses each bud, and finally denies the deployer.
+
+## Contract usage
+
+To set values on a deployed registry, run the `SetValues` script with the registry address, the keys (as plain strings, encoded to `bytes32` by the script) and the values. The account to run the script must be a bud. For example:
+
+```shell
+forge script script/SetValues.s.sol:SetValues \
+    --sig "run(address,string[],int256[])" <REGISTRY> '["EXAMPLE_WAD","EXAMPLE_BPS"]' '[900000000000000000,50]' \
+    --rpc-url mainnet \
+    --account <ACCOUNT_NAME>T \
+    --broadcast
+```
+
+Keys and values are matched by index, so the example sets `EXAMPLE_WAD = 0.9e18` and `EXAMPLE_BPS = 50` in a single `setValues` batch.

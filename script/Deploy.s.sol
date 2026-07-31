@@ -29,7 +29,7 @@ contract DeployValueRegistry is Script {
 
         vm.startBroadcast();
         (, address deployer,) = vm.readCallers();
-
+        
         registry = new ValueRegistry();
 
         bool deployerIsAdmin;
