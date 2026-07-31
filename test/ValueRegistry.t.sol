@@ -467,6 +467,20 @@ contract ValueRegistryTest is Test {
     }
 
     function testRevertGetIndexOutOfBounds() public {
+        vm.prank(bud);
+        registry.setValues(_keyValues("A", int256(1)));
+
+        _assertCount(1, "testRevertGetIndexOutOfBounds/after-set");
+
+        (bytes32 key, int256 value) = registry.get(0);
+        assertEq(key, bytes32("A"), "testRevertGetIndexOutOfBounds/after-set/key");
+        assertEq(value, int256(1), "testRevertGetIndexOutOfBounds/after-set/value");
+
+        vm.prank(bud);
+        registry.removeValues(_keys("A"));
+
+        _assertCount(0, "testRevertGetIndexOutOfBounds/after-remove");
+
         vm.expectRevert("ValueRegistry/index-out-of-bounds");
         registry.get(0);
     }
