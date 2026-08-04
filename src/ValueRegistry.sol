@@ -53,7 +53,7 @@ contract ValueRegistry {
      * @param key The removed parameter key.
      */
     event RemoveValue(bytes32 indexed key);
-    
+
     // --- Structs ---
     /// @notice A registered value and its position in the keys array
     struct Value {
