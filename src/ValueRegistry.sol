@@ -21,29 +21,6 @@ pragma solidity 0.8.34;
 /// @dev Values are signed integers; the convention is WAD scaling (1e18)
 ///      for all fractional parameters, e.g. PARAM_WAD = 0.9e18
 contract ValueRegistry {
-    // --- Structs ---
-    /// @notice A registered value and its position in the keys array
-    struct Value {
-        uint256 pos; // only meaningful if keys[pos] == key
-        int256 val; // The value, WAD-scaled by convention
-    }
-
-    /// @notice A key/value pair
-    struct KeyValue {
-        bytes32 key; // The parameter key (ex. PARAM_WAD)
-        int256 val; // The value, WAD-scaled by convention
-    }
-
-    // --- Storage Variables ---
-    /// @notice Mapping of admin addresses (can manage permissions)
-    mapping(address => uint256) public wards;
-    /// @notice Mapping of operator addresses (can manage key/value pairs)
-    mapping(address => uint256) public buds;
-    /// @notice Mapping of registered values
-    mapping(bytes32 => Value) internal values;
-    /// @notice List of registered keys
-    bytes32[] internal keys;
-
     // --- Events ---
     /**
      * @notice `usr` was granted admin access.
@@ -76,6 +53,29 @@ contract ValueRegistry {
      * @param key The removed parameter key.
      */
     event RemoveValue(bytes32 indexed key);
+    
+    // --- Structs ---
+    /// @notice A registered value and its position in the keys array
+    struct Value {
+        uint256 pos; // only meaningful if keys[pos] == key
+        int256 val; // The value, WAD-scaled by convention
+    }
+
+    /// @notice A key/value pair
+    struct KeyValue {
+        bytes32 key; // The parameter key (ex. PARAM_WAD)
+        int256 val; // The value, WAD-scaled by convention
+    }
+
+    // --- Storage Variables ---
+    /// @notice Mapping of admin addresses (can manage permissions)
+    mapping(address => uint256) public wards;
+    /// @notice Mapping of operator addresses (can manage key/value pairs)
+    mapping(address => uint256) public buds;
+    /// @notice Mapping of registered values
+    mapping(bytes32 => Value) internal values;
+    /// @notice List of registered keys
+    bytes32[] internal keys;
 
     // --- Modifiers ---
     modifier auth() {
@@ -149,7 +149,7 @@ contract ValueRegistry {
     /// @param key The parameter key (ex. PARAM_WAD)
     /// @param val The value, WAD-scaled by convention
     function _setValue(bytes32 key, int256 val) internal {
-        if (has(key)) {
+        if (count() > 0 && key == keys[values[key].pos]) {
             values[key].val = val; // Key exists in keys (update)
         } else {
             keys.push(key);
@@ -161,15 +161,14 @@ contract ValueRegistry {
     /// @notice Removes a single key from the keys list()
     /// @param key The key to be removed
     function _removeValue(bytes32 key) internal {
-        require(has(key), "ValueRegistry/invalid-key");
         uint256 index = values[key].pos; // Get pos in array
+        require(count() > 0 && keys[index] == key, "ValueRegistry/invalid-key");
         bytes32 move = keys[keys.length - 1]; // Get last key
-        if (move != key) {
-            keys[index] = move; // Replace
-            values[move].pos = index; // Update array pos
-        }
+        keys[index] = move; // Replace
+        values[move].pos = index; // Update array pos
         keys.pop(); // Trim last key
         delete values[key]; // Delete struct data
+
         emit RemoveValue(key);
     }
 
@@ -178,15 +177,6 @@ contract ValueRegistry {
     /// @return The number of keys
     function count() public view returns (uint256) {
         return keys.length;
-    }
-
-    /// @notice Returns whether a value is set for a particular key
-    /// @dev A value of 0 is indistinguishable from an unset key by value alone,
-    ///      so presence is derived from the key's position in the keys array
-    /// @param key The parameter key (ex. PARAM_WAD)
-    /// @return Whether the key is set
-    function has(bytes32 key) public view returns (bool) {
-        return count() > 0 && keys[values[key].pos] == key;
     }
 
     /// @notice Returns the key and value of an item in the registry (for enumeration)
@@ -213,7 +203,7 @@ contract ValueRegistry {
     /// @param key The parameter key (ex. PARAM_WAD)
     /// @return val The value associated with the key
     function _getValue(bytes32 key) internal view returns (int256 val) {
-        require(has(key), "ValueRegistry/invalid-key");
+        require(count() > 0 && key == keys[values[key].pos], "ValueRegistry/invalid-key");
         val = values[key].val;
     }
 

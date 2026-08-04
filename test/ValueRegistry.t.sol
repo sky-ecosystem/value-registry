@@ -76,9 +76,8 @@ contract ValueRegistryTest is Test {
     // --- State assertions ---
 
     /// @dev Asserts `key` holds `val` and sits at `index`, consistently across
-    ///      every read path: has(), getValues(), get(index) and list()
+    ///      every read path: getValues(), get(index) and list()
     function _assertEntryAt(uint256 index, bytes32 key, int256 val, string memory ctx) internal view {
-        assertTrue(registry.has(key), string.concat(ctx, "/has"));
         assertEq(registry.getValues(_keys(key))[0].val, val, string.concat(ctx, "/getValues"));
 
         (bytes32 gotKey, int256 gotVal) = registry.get(index);
@@ -88,11 +87,8 @@ contract ValueRegistryTest is Test {
         assertEq(registry.list()[index], key, string.concat(ctx, "/list"));
     }
 
-    /// @dev Asserts `key` is not registered: has() is false and getValues() reverts
-    ///      rather than silently returning 0
-    function _assertAbsent(bytes32 key, string memory ctx) internal {
-        assertFalse(registry.has(key), string.concat(ctx, "/has"));
-
+    /// @dev Asserts `key` is not registered: getValues() reverts
+    function _assertAbsent(bytes32 key, string memory) internal {
         vm.expectRevert("ValueRegistry/invalid-key");
         registry.getValues(_keys(key));
     }
