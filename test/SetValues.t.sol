@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.34;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {SetValues} from "../script/SetValues.s.sol";
 import {ValueRegistry} from "../src/ValueRegistry.sol";
@@ -41,6 +41,7 @@ contract SetValuesTest is Test {
         keys = new string[](n);
         if (n > 0) keys[0] = "EXAMPLE_WAD";
         if (n > 1) keys[1] = "EXAMPLE_BPS";
+        if (n > 2) revert("unsupported");
     }
 
     function testRun() public {
@@ -53,12 +54,8 @@ contract SetValuesTest is Test {
 
         assertEq(registry.count(), 2, "testRun/count");
 
-        bytes32[] memory queryKeys = new bytes32[](2);
-        queryKeys[0] = "EXAMPLE_WAD";
-        queryKeys[1] = "EXAMPLE_BPS";
-        ValueRegistry.KeyValue[] memory items = registry.getValues(queryKeys);
-        assertEq(items[0].val, 0.9e18, "testRun/first-value");
-        assertEq(items[1].val, -50, "testRun/second-value");
+        assertEq(registry.getValue(bytes32(bytes(keys[0]))), vals[0], "testRun/first-value");
+        assertEq(registry.getValue(bytes32(bytes(keys[1]))), vals[1], "testRun/second-value");
     }
 
     function testRevertRunNoItems() public {

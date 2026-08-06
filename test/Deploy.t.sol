@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.34;
 
-import "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 
 import {DeployValueRegistry} from "../script/Deploy.s.sol";
 import {ValueRegistry} from "../src/ValueRegistry.sol";

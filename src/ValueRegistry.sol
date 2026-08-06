@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.34;
+pragma solidity ^0.8.34;
 
 /// @title An on-chain key/value registry for signed integer parameters
 /// @notice Publicly readable data; mutating functions must be called by an authorized user
-/// @dev Values are signed integers; the convention is WAD scaling (1e18)
-///      for all fractional parameters, e.g. PARAM_WAD = 0.9e18
+/// @dev The key naming convention is to add suffix with units, e.g., `_WAD`
 contract ValueRegistry {
     // --- Events ---
     /**
@@ -56,24 +55,24 @@ contract ValueRegistry {
 
     // --- Structs ---
     /// @notice A registered value and its position in the keys array
-    struct Value {
-        uint256 pos; // only meaningful if keys[pos] == key
-        int256 val; // The value, WAD-scaled by convention
+    struct ValuePos {
+        uint256 pos; // Position of the key in the keys array (keys[pos] == key)
+        int256 val; // The value
     }
 
     /// @notice A key/value pair
     struct KeyValue {
-        bytes32 key; // The parameter key (ex. PARAM_WAD)
-        int256 val; // The value, WAD-scaled by convention
+        bytes32 key; // The parameter key (e.g., PARAM_WAD)
+        int256 val; // The value
     }
 
     // --- Storage Variables ---
     /// @notice Mapping of admin addresses (can manage permissions)
-    mapping(address => uint256) public wards;
+    mapping(address usr => uint256 allowed) public wards;
     /// @notice Mapping of operator addresses (can manage key/value pairs)
-    mapping(address => uint256) public buds;
+    mapping(address usr => uint256 allowed) public buds;
     /// @notice Mapping of registered values
-    mapping(bytes32 => Value) internal values;
+    mapping(bytes32 key => ValuePos) internal values;
     /// @notice List of registered keys
     bytes32[] internal keys;
 
@@ -124,55 +123,53 @@ contract ValueRegistry {
 
     /// @notice Set the value for one or more parameter keys
     /// @dev Later items win if the same key appears more than once in `items`
-    /// @param items The key/value pairs to set
-    function setValues(KeyValue[] calldata items) external toll {
-        for (uint256 i; i < items.length; i++) {
-            _setValue(items[i].key, items[i].val);
+    /// @param _items The key/value pairs to set
+    function setValues(KeyValue[] calldata _items) external toll {
+        for (uint256 i; i < _items.length; i++) {
+            _setValue(_items[i].key, _items[i].val);
         }
     }
 
     /// @notice Removes one or more keys from the keys list()
     /// @dev Removes each item from the array but moves the last element to its place
-    //   WARNING: To save the expense of shifting an array on-chain,
-    //     this will replace the key to be deleted with the last key
-    //     in the array, and can therefore result in keys being out
-    //     of order. Use this only if you intend to reorder the list().
-    /// @param keys_ The keys to be removed
-    function removeValues(bytes32[] calldata keys_) external toll {
-        for (uint256 i; i < keys_.length; i++) {
-            _removeValue(keys_[i]);
+    /// @param _keys The keys to be removed
+    function removeValues(bytes32[] calldata _keys) external toll {
+        for (uint256 i; i < _keys.length; i++) {
+            _removeValue(_keys[i]);
         }
     }
 
     // --- Internals ---
+
     /// @notice Set the value for a single parameter key
-    /// @param key The parameter key (ex. PARAM_WAD)
-    /// @param val The value, WAD-scaled by convention
-    function _setValue(bytes32 key, int256 val) internal {
-        if (count() > 0 && key == keys[values[key].pos]) {
-            values[key].val = val; // Key exists in keys (update)
+    /// @param _key The parameter key (ex. PARAM_WAD)
+    /// @param _val The value
+    function _setValue(bytes32 _key, int256 _val) internal {
+        if (count() > 0 && keys[values[_key].pos] == _key) {
+            values[_key].val = _val; // Key exists in keys (update)
         } else {
-            keys.push(key);
-            values[key] = Value(keys.length - 1, val);
+            keys.push(_key);
+            values[_key] = ValuePos({pos: count() - 1, val: _val});
         }
-        emit SetValue(key, val);
+        emit SetValue(_key, _val);
     }
 
     /// @notice Removes a single key from the keys list()
-    /// @param key The key to be removed
-    function _removeValue(bytes32 key) internal {
-        uint256 index = values[key].pos; // Get pos in array
-        require(count() > 0 && keys[index] == key, "ValueRegistry/invalid-key");
-        bytes32 move = keys[keys.length - 1]; // Get last key
+    /// @param _key The key to be removed
+    function _removeValue(bytes32 _key) internal {
+        uint256 index = values[_key].pos; // Get position in the array
+        require(count() > 0 && keys[index] == _key, "ValueRegistry/invalid-key");
+        bytes32 move = keys[count() - 1]; // Get last key
         keys[index] = move; // Replace
         values[move].pos = index; // Update array pos
         keys.pop(); // Trim last key
-        delete values[key]; // Delete struct data
+        delete values[_key]; // Delete struct data
 
-        emit RemoveValue(key);
+        emit RemoveValue(_key);
     }
 
     // --- Getters ---
+
     /// @notice Returns the number of keys being tracked in the keys array
     /// @return The number of keys
     function count() public view returns (uint256) {
@@ -180,31 +177,19 @@ contract ValueRegistry {
     }
 
     /// @notice Returns the key and value of an item in the registry (for enumeration)
-    /// @param index The 0-based index into the underlying keys array
+    /// @param _index The 0-based index into the underlying keys array
     /// @return The key and the value associated with it
-    function get(uint256 index) external view returns (bytes32, int256) {
-        require(index < keys.length, "ValueRegistry/index-out-of-bounds");
-        return (keys[index], values[keys[index]].val);
-    }
-
-    /// @notice Returns the key/value pairs for a set of keys, in the order requested
-    /// @dev Reverts if any of the keys is unset; there is no partial result.
-    ///      The result is shaped so it can be fed straight back into `setValues`
-    /// @param keys_ The parameter keys (ex. PARAM_WAD)
-    /// @return items The key/value pairs associated with the keys
-    function getValues(bytes32[] calldata keys_) external view returns (KeyValue[] memory items) {
-        items = new KeyValue[](keys_.length);
-        for (uint256 i; i < keys_.length; i++) {
-            items[i] = KeyValue(keys_[i], _getValue(keys_[i]));
-        }
+    function get(uint256 _index) external view returns (bytes32, int256) {
+        require(_index < count(), "ValueRegistry/index-out-of-bounds");
+        return (keys[_index], values[keys[_index]].val);
     }
 
     /// @notice Returns the value for a particular key
-    /// @param key The parameter key (ex. PARAM_WAD)
+    /// @param _key The parameter key (ex. PARAM_WAD)
     /// @return val The value associated with the key
-    function _getValue(bytes32 key) internal view returns (int256 val) {
-        require(count() > 0 && key == keys[values[key].pos], "ValueRegistry/invalid-key");
-        val = values[key].val;
+    function getValue(bytes32 _key) external view returns (int256 val) {
+        require(count() > 0 && keys[values[_key].pos] == _key, "ValueRegistry/invalid-key");
+        val = values[_key].val;
     }
 
     /// @return The list of keys being tracked by the registry

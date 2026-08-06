@@ -4,7 +4,6 @@ out = "out"
 libs = ["lib"]
 solc_version = "0.8.34"
 optimizer = false
-evm_version = "cancun"
 
 [rpc_endpoints]
 mainnet = "${ETH_RPC_URL}"

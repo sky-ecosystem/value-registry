@@ -1,6 +1,10 @@
 # Value Registry
 
-On-chain key/value registry for numeric parameters, structurally similar to the [Chainlog](https://github.com/makerdao/dss-chain-log) but storing **signed integer values** (`int256`) instead of addresses.
+On-chain key/value registry for numeric parameters, structurally similar to the [Chainlog](https://github.com/makerdao/dss-chain-log) but storing **signed integer values** (`int256`) instead of addresses. 
+
+## Intended use-case
+
+Offchain bots and frontends that need a central place to store shared meta-parameters and require access to the history of the meta-parameter changes.
 
 ## Roles
 
@@ -11,18 +15,16 @@ On-chain key/value registry for numeric parameters, structurally similar to the 
 
 Write (buds only):
 
-- **`setValues(KeyValue[] items)`** — set or overwrite values. `KeyValue` is `{bytes32 key; int256 val;}`. If the same key appears twice in one call, the last item wins.
-- **`removeValues(bytes32[] keys)`** — remove keys, reverts if any is unset.
+- **`setValues(KeyValue[] items)`** — set or overwrite values. `KeyValue` is `{bytes32 key; int256 val;}`. If the same key appears twice in one call, the last item wins. Emits `SetValue(key, val)` for every updated value.
+- **`removeValues(bytes32[] keys)`** — remove keys, reverts if any is unset. Emits `RemoveValue(key)` for every removed key.
 
 Both methods are batch-only; pass a one-element array for a single update. A batch is atomic - if `removeValues` hits an unset key partway through, the whole call reverts and no keys are removed.
 
 Read:
 
 - **`getValue(bytes32 key)`** — returns the value, reverts if the key is unset so an unset parameter can never be silently read as `0`.
-- **`getValues(bytes32[] keys)`** — returns `KeyValue[]` in the order requested; reverts if any key is unset, so there is never a partial result. The result can be fed straight back into `setValues`.
-- **`has(bytes32 key)`**, **`count()`**, **`get(uint256 index)`**, **`list()`** — enumeration helpers.
+- **`count()`**, **`get(uint256 index)`**, **`list()`** — enumeration helpers. Note that as `removeValues` uses swap-and-pop logic, `get(index)` and `list()` ordering changes on removal – therefore avoid fetching values using their index.
 
-Every mutation emits `SetValue(key, val)` or `RemoveValue(key)`.
 
 ## Value convention
 
@@ -32,11 +34,11 @@ The registry itself is agnostic about keys and values. However, the proposed con
 
 ```shell
 forge build      # compile
-forge test       # run tests (requires `ETH_RPC_URL` to run test on ethereum mainnet fork)
+forge test       # run tests
 forge fmt        # format
 ```
 
-Clone with submodule (`forge-std`):
+Clone with submodules:
 
 ```shell
 git clone --recurse-submodules <repo-url>
@@ -60,7 +62,7 @@ git submodule update --init --recursive
         --broadcast
     ```
 
-The script deploys the registry (the deployer becomes a ward via the constructor), relies each admin, kisses each bud, and finally denies the deployer.
+The script deploys the registry (the deployer becomes a ward via the constructor), relies each admin, kisses each bud, and finally denies the deployer (unless it is included in the admin list).
 
 ## Contract usage
 
@@ -70,7 +72,7 @@ To set values on a deployed registry, run the `SetValues` script with the regist
 forge script script/SetValues.s.sol:SetValues \
     --sig "run(address,string[],int256[])" <REGISTRY> '["EXAMPLE_WAD","EXAMPLE_BPS"]' '[900000000000000000,50]' \
     --rpc-url mainnet \
-    --account <ACCOUNT_NAME>T \
+    --account <ACCOUNT_NAME> \
     --broadcast
 ```
 

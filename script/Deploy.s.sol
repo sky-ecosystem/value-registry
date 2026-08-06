@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.34;
+pragma solidity ^0.8.34;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 
 import {ValueRegistry} from "../src/ValueRegistry.sol";
 
@@ -48,5 +48,7 @@ contract DeployValueRegistry is Script {
             registry.deny(deployer);
         }
         vm.stopBroadcast();
+
+        console.log("ValueRegistry was successfully deployed at", address(registry));
     }
 }

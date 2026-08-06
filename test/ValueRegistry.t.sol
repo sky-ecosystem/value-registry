@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.34;
+pragma solidity ^0.8.34;
 
-import "forge-std/Test.sol";
+import {DssTest} from "dss-test/DssTest.sol";
 
 import {ValueRegistry} from "../src/ValueRegistry.sol";
 
-contract ValueRegistryTest is Test {
+contract ValueRegistryTest is DssTest {
     ValueRegistry registry;
 
     address bud = address(0xb0d);
@@ -28,7 +28,6 @@ contract ValueRegistryTest is Test {
     address unauth = address(0xdead);
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"));
         registry = new ValueRegistry();
         registry.kiss(bud);
     }
@@ -76,9 +75,9 @@ contract ValueRegistryTest is Test {
     // --- State assertions ---
 
     /// @dev Asserts `key` holds `val` and sits at `index`, consistently across
-    ///      every read path: getValues(), get(index) and list()
+    ///      every read path: getValue(), get(index) and list()
     function _assertEntryAt(uint256 index, bytes32 key, int256 val, string memory ctx) internal view {
-        assertEq(registry.getValues(_keys(key))[0].val, val, string.concat(ctx, "/getValues"));
+        assertEq(registry.getValue(_keys(key)[0]), val, string.concat(ctx, "/getValue"));
 
         (bytes32 gotKey, int256 gotVal) = registry.get(index);
         assertEq(gotKey, key, string.concat(ctx, "/get-key"));
@@ -87,10 +86,10 @@ contract ValueRegistryTest is Test {
         assertEq(registry.list()[index], key, string.concat(ctx, "/list"));
     }
 
-    /// @dev Asserts `key` is not registered: getValues() reverts
+    /// @dev Asserts `key` is not registered: getValue() reverts
     function _assertAbsent(bytes32 key, string memory) internal {
         vm.expectRevert("ValueRegistry/invalid-key");
-        registry.getValues(_keys(key));
+        registry.getValue(_keys(key)[0]);
     }
 
     /// @dev Asserts the registry holds exactly `n` keys, and that index `n` is
@@ -115,17 +114,27 @@ contract ValueRegistryTest is Test {
     }
 
     function testAuth() public {
-        assertEq(registry.wards(auth), 0, "testAuth/not-ward-by-default");
+        checkAuth(address(registry), "ValueRegistry");
+    }
 
-        vm.expectEmit(true, false, false, true);
-        emit ValueRegistry.Rely(auth);
-        registry.rely(auth);
-        assertEq(registry.wards(auth), 1, "testAuth/after-rely");
+    function testAuthModifiersWards() public {
+        bytes4[] memory authedMethods = new bytes4[](2);
+        authedMethods[0] = ValueRegistry.kiss.selector;
+        authedMethods[1] = ValueRegistry.diss.selector;
 
-        vm.expectEmit(true, false, false, true);
-        emit ValueRegistry.Deny(auth);
-        registry.deny(auth);
-        assertEq(registry.wards(auth), 0, "testAuth/after-deny");
+        vm.startPrank(unauth);
+        checkModifier(address(registry), "ValueRegistry/not-authorized", authedMethods);
+        vm.stopPrank();
+    }
+
+    function testAuthModifiersBuds() public {
+        bytes4[] memory authedMethods = new bytes4[](2);
+        authedMethods[0] = ValueRegistry.setValues.selector;
+        authedMethods[1] = ValueRegistry.removeValues.selector;
+
+        vm.startPrank(unauth);
+        checkModifier(address(registry), "ValueRegistry/not-bud", authedMethods);
+        vm.stopPrank();
     }
 
     function testKissDiss() public {
@@ -140,19 +149,6 @@ contract ValueRegistryTest is Test {
         emit ValueRegistry.Diss(auth);
         registry.diss(auth);
         assertEq(registry.buds(auth), 0, "testKissDiss/after-diss");
-    }
-
-    function testAuthMethods() public {
-        vm.startPrank(unauth);
-        vm.expectRevert("ValueRegistry/not-authorized");
-        registry.rely(auth);
-        vm.expectRevert("ValueRegistry/not-authorized");
-        registry.deny(auth);
-        vm.expectRevert("ValueRegistry/not-authorized");
-        registry.kiss(auth);
-        vm.expectRevert("ValueRegistry/not-authorized");
-        registry.diss(auth);
-        vm.stopPrank();
     }
 
     function testTollMethods() public {
@@ -374,54 +370,24 @@ contract ValueRegistryTest is Test {
         _assertCount(0, "testEmptyBatchIsNoop/after-empty-remove");
     }
 
-    // --- getValues ---
-
-    function testGetValues() public {
+    function testGetValue() public {
         vm.prank(bud);
         registry.setValues(_keyValues("A", int256(1), "B", int256(0), "C", int256(-3)));
 
-        // pairs come back in the order requested, not in registry order
-        ValueRegistry.KeyValue[] memory items = registry.getValues(_keys("C", "A"));
-        assertEq(items.length, 2, "testGetValues/length");
-        assertEq(items[0].key, bytes32("C"), "testGetValues/first/key");
-        assertEq(items[0].val, int256(-3), "testGetValues/first/val");
-        assertEq(items[1].key, bytes32("A"), "testGetValues/second/key");
-        assertEq(items[1].val, int256(1), "testGetValues/second/val");
-
-        // a repeated key is served once per occurrence
-        items = registry.getValues(_keys("B", "B"));
-        assertEq(items.length, 2, "testGetValues/duplicate/length");
-        assertEq(items[0].val, int256(0), "testGetValues/duplicate/first");
-        assertEq(items[1].val, int256(0), "testGetValues/duplicate/second");
-    }
-
-    function testGetValuesRoundTripsIntoSetValues() public {
-        vm.prank(bud);
-        registry.setValues(_keyValues("A", int256(1), "B", int256(2)));
-
-        // the read output is valid write input: feeding it back is a no-op
-        ValueRegistry.KeyValue[] memory items = registry.getValues(registry.list());
-        vm.prank(bud);
-        registry.setValues(items);
-
-        _assertCount(2, "testGetValuesRoundTripsIntoSetValues/round-trip-must-not-duplicate-keys");
-        _assertEntryAt(0, "A", int256(1), "testGetValuesRoundTripsIntoSetValues/round-tripped");
-        _assertEntryAt(1, "B", int256(2), "testGetValuesRoundTripsIntoSetValues/round-tripped");
-    }
-
-    function testGetValuesEmptyBatch() public view {
-        assertEq(registry.getValues(new bytes32[](0)).length, 0, "testGetValuesEmptyBatch/length");
+        assertEq(registry.getValue("C"), int256(-3), "testGetValue/C/val");
+        assertEq(registry.getValue("B"), int256(0), "testGetValue/B/first");
+        assertEq(registry.getValue("A"), int256(1), "testGetValue/A/val");
     }
 
     // --- Reverts ---
 
-    function testRevertGetValuesUnsetKey() public {
+    function testRevertGetValueUnsetKey() public {
         vm.prank(bud);
         registry.setValues(_keyValues("A", int256(1)));
 
-        // one unset key fails the whole call; there is no partial result
+        // unset key fails the call
         vm.expectRevert("ValueRegistry/invalid-key");
-        registry.getValues(_keys("A", "UNSET"));
+        registry.getValue("UNSET");
     }
 
     function testRevertRemoveValueBatchIsAtomic() public {
@@ -435,6 +401,8 @@ contract ValueRegistryTest is Test {
         vm.expectRevert("ValueRegistry/invalid-key");
         vm.prank(bud);
         registry.removeValues(_keys("A", "UNSET"));
+
+        _assertEntryAt(0, "A", int256(1), "testRevertRemoveValueBatchIsAtomic/after-set");
     }
 
     function testRevertRemoveValueUnsetKey() public {
