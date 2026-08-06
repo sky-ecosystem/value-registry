@@ -55,6 +55,7 @@ git submodule update --init --recursive
         --sig "run(address[],address[])" "[<ADMIN_1>,<ADMIN_2>]" "[<BUD_1>]" \
         --rpc-url mainnet \
         --account <ACCOUNT_NAME> \
+        --sender "$(cast wallet address --account <ACCOUNT_NAME>)" \
         --verify \
         --broadcast
     ```
