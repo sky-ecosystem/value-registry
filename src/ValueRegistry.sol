@@ -72,7 +72,7 @@ contract ValueRegistry {
     /// @notice Mapping of operator addresses (can manage key/value pairs)
     mapping(address usr => uint256 allowed) public buds;
     /// @notice Mapping of registered values
-    mapping(bytes32 key => ValuePos) internal values;
+    mapping(bytes32 key => ValuePos value) internal values;
     /// @notice List of registered keys
     bytes32[] internal keys;
 
@@ -142,7 +142,7 @@ contract ValueRegistry {
     // --- Internals ---
 
     /// @notice Set the value for a single parameter key
-    /// @param _key The parameter key (ex. PARAM_WAD)
+    /// @param _key The parameter key (e.g., PARAM_WAD)
     /// @param _val The value
     function _setValue(bytes32 _key, int256 _val) internal {
         if (count() > 0 && keys[values[_key].pos] == _key) {
@@ -185,7 +185,7 @@ contract ValueRegistry {
     }
 
     /// @notice Returns the value for a particular key
-    /// @param _key The parameter key (ex. PARAM_WAD)
+    /// @param _key The parameter key (e.g., PARAM_WAD)
     /// @return val The value associated with the key
     function getValue(bytes32 _key) external view returns (int256 val) {
         require(count() > 0 && keys[values[_key].pos] == _key, "ValueRegistry/invalid-key");
