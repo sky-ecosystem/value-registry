@@ -76,11 +76,22 @@ contract SetValuesTest is Test {
         script.run(registry, keys, new int256[](1));
     }
 
-    function testRevertRunKeyTooLong() public {
+    function testRunKeyLengthBoundary() public {
         string[] memory keys = new string[](1);
-        keys[0] = "THIS_KEY_IS_LONGER_THAN_32_BYTES_STRING";
+        int256[] memory vals = new int256[](1);
+        vals[0] = 1;
+
+        keys[0] = "THIS_KEY_IS_EXACTLY_32_BYTES_LON";
+        assertEq(bytes(keys[0]).length, 32, "testRunKeyLengthBoundary/max-sanity");
+
+        script.run(registry, keys, vals);
+
+        assertEq(registry.getValue(bytes32(bytes(keys[0]))), vals[0], "testRunKeyLengthBoundary/max-value");
+
+        keys[0] = "THIS_KEY_IS_EXACTLY_33_BYTES_LONG";
+        assertEq(bytes(keys[0]).length, 33, "testRunKeyLengthBoundary/too-long-sanity");
 
         vm.expectRevert("SetValues/invalid-key");
-        script.run(registry, keys, new int256[](1));
+        script.run(registry, keys, vals);
     }
 }
